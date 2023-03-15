@@ -2,7 +2,7 @@ import Notiflix from 'notiflix';
 
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
-import SearchApiService from './js/search-service.js';
+import SearchApiService from './js/search-service';
 
 const searchForm = document.querySelector('.search-form');
 const galleryItems = document.querySelector('.gallery');
@@ -20,7 +20,7 @@ let simpleLightbox = new SimpleLightbox('.gallery a', {
   captionDelay: 500,
 });
 
-async function onSearch(e) {
+function onSearch(e) {
   e.preventDefault();
 
   picturesApiService.query = e.target.elements.searchQuery.value;
@@ -28,11 +28,11 @@ async function onSearch(e) {
 
   picturesApiService.resetPage();
 
-  try {
-    const pictures = await picturesApiService.fetchImages();
-    pictures(response => {
-      const responseHits = response.data.hits;
+  picturesApiService
+    .fetchImages()
+    .then(response => {
       const totalHits = response.data.totalHits;
+      const responseHits = response.data.hits;
 
       if (!responseHits.length) {
         Notiflix.Notify.info(
@@ -45,7 +45,7 @@ async function onSearch(e) {
       }
 
       if (!picturesApiService.query) {
-        clearAll();
+        clearPicturesContainer();
         buttonHidden();
         Notiflix.Notify.info('You cannot search by empty field, try again.');
         return;
@@ -55,9 +55,8 @@ async function onSearch(e) {
 
         galleryItems.innerHTML = renderImageCards(responseHits);
         simpleLightbox.refresh();
-        smoothScroll();
 
-        if (totalHits <= responseHits.length) {
+        if (Math.ceil(totalHits / 40) === picturesApiService.page) {
           buttonHidden();
           console.log(totalHits);
           setTimeout(() => {
@@ -70,36 +69,33 @@ async function onSearch(e) {
           buttonShow();
         }
       }
+    })
+    .catch(error => {
+      console.error(error);
     });
-  } catch (error) {
-    console.log(error);
-  }
 }
-// searchBtn.disabled = false;
 
 function onLoadMore() {
   picturesApiService.page += 1;
 
   picturesApiService.fetchImages().then(response => {
     const responseHits = response.data.hits;
-
+    const totalHits = response.data.totalHits;
     galleryItems.insertAdjacentHTML(
       'beforeend',
       renderImageCards(responseHits)
     );
     simpleLightbox.refresh();
+    smoothScroll();
+    if (Math.ceil(totalHits / 40) === picturesApiService.page) {
+      setTimeout(() => {
+        buttonHidden();
+        Notiflix.Notify.info(
+          "We're sorry, but you've reached the end of search results."
+        );
+      }, 5000);
+    }
   });
-
-  if (totalHits <= responseHits.length) {
-    setTimeout(() => {
-      buttonHidden();
-      Notiflix.Report.info(
-        "We're sorry, but you've reached the end of search results."
-      );
-    }, 5000);
-  }
-
-  smoothScroll();
 }
 
 function renderImageCards(responseHits) {
@@ -148,7 +144,6 @@ function buttonHidden() {
 function buttonShow() {
   setTimeout(() => {
     loadMoreBtn.classList.remove('visually-hidden');
-    // isBtnVisible = false;
   }, 3000);
 }
 
