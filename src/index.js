@@ -27,9 +27,10 @@ async function onSearch(e) {
   searchBtn.disabled = true;
 
   picturesApiService.resetPage();
-  await picturesApiService
-    .fetchImages()
-    .then(response => {
+
+  try {
+    const pictures = await picturesApiService.fetchImages();
+    pictures(response => {
       const responseHits = response.data.hits;
       const totalHits = response.data.totalHits;
 
@@ -69,14 +70,12 @@ async function onSearch(e) {
           buttonShow();
         }
       }
-    })
-    .catch(err => {
-      console.log(err);
-    })
-    .finally(() => {
-      searchBtn.disabled = false;
     });
+  } catch (error) {
+    console.log(error);
+  }
 }
+// searchBtn.disabled = false;
 
 function onLoadMore() {
   picturesApiService.page += 1;
@@ -149,7 +148,7 @@ function buttonHidden() {
 function buttonShow() {
   setTimeout(() => {
     loadMoreBtn.classList.remove('visually-hidden');
-    isBtnVisible = false;
+    // isBtnVisible = false;
   }, 3000);
 }
 
