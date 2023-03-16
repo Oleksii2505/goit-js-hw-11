@@ -7,7 +7,7 @@ import SearchApiService from './js/search-service';
 const searchForm = document.querySelector('.search-form');
 const galleryItems = document.querySelector('.gallery');
 const loadMoreBtn = document.querySelector('.load-more');
-const searchBtn = document.querySelector('.js-search-btn');
+// const searchBtn = document.querySelector('.js-search-btn');
 
 const picturesApiService = new SearchApiService();
 
@@ -17,68 +17,72 @@ loadMoreBtn.addEventListener('click', onLoadMore);
 let simpleLightbox = new SimpleLightbox('.gallery a', {
   captions: true,
   captionsData: 'alt',
-  captionDelay: 500,
+  captionDelay: 250,
 });
 
-function onSearch(e) {
+async function onSearch(e) {
   e.preventDefault();
 
-  picturesApiService.query = e.target.elements.searchQuery.value;
-  searchBtn.disabled = true;
+  const searchQuery = e.target.elements.searchQuery.value.trim();
+  if (!searchQuery) {
+    return Notiflix.Notify.info(
+      'Your search query contains invalid characters. Please try again without spaces.'
+    );
+  }
+
+  picturesApiService.query = searchQuery;
+  // searchBtn.disabled = true;
 
   picturesApiService.resetPage();
 
-  picturesApiService
-    .fetchImages()
-    .then(response => {
-      const totalHits = response.data.totalHits;
-      const responseHits = response.data.hits;
+  try {
+    const response = await picturesApiService.fetchImages();
+    const totalHits = response.data.totalHits;
+    const responseHits = response.data.hits;
+    if (!responseHits.length) {
+      Notiflix.Notify.info(
+        'Sorry, there are no images matching your search query. Please try again.'
+      );
+      e.target.reset();
+      galleryItems.innerHTML = '';
 
-      if (!responseHits.length) {
-        Notiflix.Notify.info(
-          'Sorry, there are no images matching your search query. Please try again.'
-        );
-        e.target.reset();
-        galleryItems.innerHTML = '';
-        buttonHidden();
-        return;
-      }
+      return;
+    }
 
-      if (!picturesApiService.query) {
-        clearPicturesContainer();
-        buttonHidden();
-        Notiflix.Notify.info('You cannot search by empty field, try again.');
+    if (!picturesApiService.query) {
+      clearPicturesContainer();
+
+      Notiflix.Notify.info('You cannot search by empty field, try again.');
+      return;
+    } else {
+      Notiflix.Notify.success(`Hooray! We found ${totalHits} images.`);
+      clearPicturesContainer();
+
+      galleryItems.innerHTML = renderImageCards(responseHits);
+      simpleLightbox.refresh();
+      if (Math.ceil(totalHits / 40) === picturesApiService.page) {
+        console.log(totalHits);
+        setTimeout(() => {
+          Notiflix.Notify.info(
+            "We're sorry, but you've reached the end of search results."
+          );
+        }, 2000);
         return;
       } else {
-        Notiflix.Notify.success(`Hooray! We found ${totalHits} images.`);
-        clearPicturesContainer();
-
-        galleryItems.innerHTML = renderImageCards(responseHits);
-        simpleLightbox.refresh();
-
-        if (Math.ceil(totalHits / 40) === picturesApiService.page) {
-          buttonHidden();
-          console.log(totalHits);
-          setTimeout(() => {
-            Notiflix.Notify.info(
-              "We're sorry, but you've reached the end of search results."
-            );
-          }, 5000);
-          return;
-        } else {
-          buttonShow();
-        }
+        buttonShow();
       }
-    })
-    .catch(error => {
-      console.error(error);
-    });
+    }
+  } catch (error) {
+    console.error(error);
+  }
+  // searchBtn.disabled = false;
 }
 
-function onLoadMore() {
+async function onLoadMore() {
   picturesApiService.page += 1;
 
-  picturesApiService.fetchImages().then(response => {
+  try {
+    const response = await picturesApiService.fetchImages();
     const responseHits = response.data.hits;
     const totalHits = response.data.totalHits;
     galleryItems.insertAdjacentHTML(
@@ -93,9 +97,11 @@ function onLoadMore() {
         Notiflix.Notify.info(
           "We're sorry, but you've reached the end of search results."
         );
-      }, 5000);
+      }, 2000);
     }
-  });
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 function renderImageCards(responseHits) {
